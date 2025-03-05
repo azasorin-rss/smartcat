@@ -7,6 +7,7 @@ use crate::config::{
     api::{Api, ApiConfig},
     prompt::{Message, Prompt},
 };
+use crate::text::bedrock::bedrock;
 use crate::utils::handle_api_response;
 
 use log::debug;
@@ -20,10 +21,20 @@ enum PromptFormat {
     Anthropic(AnthropicPrompt),
 }
 
+fn do_bedrock(api_config: ApiConfig, prompt: &Prompt) -> anyhow::Result<Message> {
+    use tokio::runtime::Runtime;
+
+    // Create the runtime
+    let rt = Runtime::new().unwrap();
+
+    // Execute the future, blocking the current thread until completion
+    rt.block_on(bedrock(api_config, prompt))
+}
+
 pub fn post_prompt_and_get_answer(
     api_config: ApiConfig,
     prompt: &Prompt,
-) -> reqwest::Result<Message> {
+) -> anyhow::Result<Message> {
     debug!(
         "Trying to reach {:?} with key {:?}",
         api_config.url, api_config.api_key
@@ -38,6 +49,10 @@ pub fn post_prompt_and_get_answer(
 
     // currently not compatible with streams
     prompt.stream = Some(false);
+
+    if prompt.api == Api::Bedrock {
+        return do_bedrock(api_config, &prompt);
+    }
 
     let client = reqwest::blocking::Client::builder()
         .timeout(
@@ -54,6 +69,7 @@ pub fn post_prompt_and_get_answer(
         }
         Api::Anthropic => PromptFormat::Anthropic(AnthropicPrompt::from(prompt.clone())),
         Api::AnotherApiForTests => panic!("This api is not made for actual use."),
+        Api::Bedrock => unreachable!(),
     };
 
     let request = client
@@ -92,6 +108,7 @@ pub fn post_prompt_and_get_answer(
         }
         Api::Anthropic => handle_api_response::<AnthropicResponse>(request.send()?),
         Api::AnotherApiForTests => unreachable!(),
+        Api::Bedrock => unreachable!(),
     };
     Ok(Message::assistant(&response_text))
 }

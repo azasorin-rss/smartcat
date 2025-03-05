@@ -1,4 +1,5 @@
 mod api_call;
+mod bedrock;
 mod request_schemas;
 mod response_schemas;
 

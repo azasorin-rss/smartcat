@@ -22,6 +22,7 @@ pub enum Api {
     Openai,
     AzureOpenai,
     Cerebras,
+    Bedrock,
 }
 
 impl FromStr for Api {
@@ -36,6 +37,7 @@ impl FromStr for Api {
             "groq" => Ok(Api::Groq),
             "anthropic" => Ok(Api::Anthropic),
             "cerebras" => Ok(Api::Cerebras),
+            "bedrock" => Ok(Api::Bedrock),
             _ => Err(()),
         }
     }
@@ -51,6 +53,7 @@ impl ToString for Api {
             Api::Groq => "groq".to_string(),
             Api::Anthropic => "anthropic".to_string(),
             Api::Cerebras => "cerebras".to_string(),
+            Api::Bedrock => "bedrock".to_string(),
             v => panic!(
                 "{:?} is not implemented, use one among {:?}",
                 v,
@@ -75,6 +78,8 @@ pub struct ApiConfig {
         skip_serializing_if = "Option::is_none"
     )]
     pub timeout_seconds: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aws_profile: Option<String>,
 }
 
 pub(super) fn default_timeout_seconds() -> Option<u32> {
@@ -124,6 +129,7 @@ impl ApiConfig {
             default_model: Some(String::from("phi3")),
             version: None,
             timeout_seconds: Some(180),
+            aws_profile: None,
         }
     }
 
@@ -135,6 +141,7 @@ impl ApiConfig {
             default_model: Some(String::from("gpt-4")),
             version: None,
             timeout_seconds: None,
+            aws_profile: None,
         }
     }
 
@@ -146,6 +153,7 @@ impl ApiConfig {
             default_model: Some(String::from("gpt-4o")),
             version: None,
             timeout_seconds: None,
+            aws_profile: None,
         }
     }
 
@@ -157,6 +165,7 @@ impl ApiConfig {
             default_model: Some(String::from("mistral-medium")),
             version: None,
             timeout_seconds: None,
+            aws_profile: None,
         }
     }
 
@@ -168,6 +177,7 @@ impl ApiConfig {
             default_model: Some(String::from("llama3-70b-8192")),
             version: None,
             timeout_seconds: None,
+            aws_profile: None,
         }
     }
 
@@ -179,6 +189,7 @@ impl ApiConfig {
             default_model: Some(String::from("claude-3-opus-20240229")),
             version: Some(String::from("2023-06-01")),
             timeout_seconds: None,
+            aws_profile: None,
         }
     }
 
@@ -190,6 +201,19 @@ impl ApiConfig {
             default_model: Some(String::from("llama3.1-70b")),
             version: None,
             timeout_seconds: None,
+            aws_profile: None,
+        }
+    }
+
+    pub(super) fn bedrock() -> Self {
+        ApiConfig {
+            api_key_command: None,
+            api_key: None,
+            url: String::from("not relevant"),
+            default_model: Some(String::from("amazon.nova-lite-v1:0")),
+            version: None,
+            timeout_seconds: None,
+            aws_profile: Some(String::from("default")),
         }
     }
 }
@@ -207,6 +231,7 @@ pub(super) fn generate_api_keys_file() -> std::io::Result<()> {
     api_config.insert(Api::Groq.to_string(), ApiConfig::groq());
     api_config.insert(Api::Anthropic.to_string(), ApiConfig::anthropic());
     api_config.insert(Api::Cerebras.to_string(), ApiConfig::cerebras());
+    api_config.insert(Api::Bedrock.to_string(), ApiConfig::bedrock());
 
     // Default, should override one of the above
     api_config.insert(Prompt::default().api.to_string(), ApiConfig::default());

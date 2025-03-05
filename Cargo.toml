@@ -17,6 +17,8 @@ readme="README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+aws-config = "1.5.17"
+aws-sdk-bedrockruntime = "1.75.0"
 clap = { version = "4", features = ["derive"] }
 glob = "0"
 log = "0"
@@ -25,6 +27,8 @@ serde_json = "1"
 toml = "0"
 env_logger = "0"
 reqwest = { version = "0", default-features = false, features = ["http2", "json", "blocking", "multipart", "rustls-tls"] }
+tokio = { version = "1.43.0", features = ["full"] }
+anyhow = "1.0.97"
 
 [dev-dependencies]
 tempfile = "3"
