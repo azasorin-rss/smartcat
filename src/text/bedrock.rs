@@ -18,14 +18,14 @@ struct InferenceConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct ContentThing {
+struct NovaMessageContent {
     text: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct NovaMessage {
     role: String,
-    content: Vec<ContentThing>,
+    content: Vec<NovaMessageContent>,
 }
 
 impl From<NovaMessage> for Message {
@@ -38,6 +38,8 @@ impl From<NovaMessage> for Message {
 struct NovaLiteRequest {
     #[serde(rename = "inferenceConfig")]
     inference_config: InferenceConfig,
+
+    system: Vec<NovaMessageContent>,
 
     messages: Vec<NovaMessage>,
 }
@@ -53,22 +55,38 @@ struct NovaLiteResponse {
 }
 
 impl NovaLiteRequest {
-    pub fn new(content: &str) -> Self {
+    pub fn new(prompt: &Prompt) -> Self {
+        let (system_messages, other_messages): (Vec<&Message>, Vec<&Message>) =
+            prompt.messages.iter().partition(|m| &m.role == "system");
+
+        let system = system_messages
+            .iter()
+            .map(|m| NovaMessageContent {
+                text: m.content.clone(),
+            })
+            .collect();
+
+        let messages = other_messages
+            .iter()
+            .map(|m| NovaMessage {
+                role: m.role.clone(),
+                content: vec![NovaMessageContent {
+                    text: m.content.clone(),
+                }],
+            })
+            .collect();
+
         Self {
             inference_config: InferenceConfig {
                 max_new_tokens: 1000,
             },
-            messages: vec![NovaMessage {
-                role: String::from("user"),
-                content: vec![ContentThing {
-                    text: content.to_string(),
-                }],
-            }],
+            system,
+            messages,
         }
     }
 }
 
-pub async fn bedrock(api_config: ApiConfig, prompt: &Prompt) -> anyhow::Result<Message> {
+pub async fn bedrock(_api_config: ApiConfig, prompt: &Prompt) -> anyhow::Result<Message> {
     // Load configuration
     let region_provider = RegionProviderChain::default_provider().or_else(Region::new("us-west-2")); // Replace with your preferred region
     let config = aws_config::defaults(BehaviorVersion::latest())
@@ -83,10 +101,7 @@ pub async fn bedrock(api_config: ApiConfig, prompt: &Prompt) -> anyhow::Result<M
         .build();
     let client = Client::from_conf(bedrock_config);
 
-    let user_prompt = "write a very short poem";
-
-    let request = NovaLiteRequest::new(user_prompt);
-
+    let request = NovaLiteRequest::new(prompt);
     let body = serde_json::to_string(&request).unwrap();
 
     // Make a request to Bedrock
@@ -101,8 +116,6 @@ pub async fn bedrock(api_config: ApiConfig, prompt: &Prompt) -> anyhow::Result<M
     let inner = response.body.into_inner();
 
     let resp = serde_json::from_slice::<NovaLiteResponse>(&inner).unwrap();
-
-    // println!("{}", resp.output.message.content[0].text);
 
     Ok(resp.output.message.into())
 }
